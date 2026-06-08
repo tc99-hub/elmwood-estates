@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Elmwood Estates PWA Scorecard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons for touch interface -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        golf: {
+                            gold: '#d4af37', // Tee Box
+                            pink: '#ff1493', // Cup/Target
+                            lawn: '#15803d', // Grass Background
+                            fairway: '#22c55e',
+                            darkGreen: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Force iOS standard momentum scrolling and prevent accidental elastic bouncing */
+        body {
+            -webkit-overflow-scrolling: touch;
+            user-select: none;
+            -webkit-user-select: none;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        /* Tap feedback active states */
+        .tap-target:active {
+            transform: scale(0.96);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-900 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- Header / Branding Bar -->
+    <header class="bg-golf-darkGreen text-white text-center py-4 px-4 sticky top-0 z-40 shadow-md">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-flag text-golf-gold text-lg"></i>
+                <h1 class="font-extrabold text-lg tracking-wide">ELMWOOD ESTATES</h1>
+            </div>
+            <span class="text-xs bg-emerald-800 text-emerald-200 px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider">San Ramon, CA</span>
+        </div>
+    </header>
+
+    <!-- Main Content App Canvas (Simulated iPhone Width on Desktop) -->
+    <main class="flex-grow w-full max-w-md mx-auto px-4 py-4 flex flex-col space-y-4">
+        
+        <!-- Dashboard Score Hub -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 grid grid-cols-3 gap-2">
+            <div class="text-center border-r border-stone-100">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">To Par</span>
+                <span id="stat-to-par" class="text-2xl font-black text-stone-800">E</span>
+            </div>
+            <div class="text-center border-r border-stone-100">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Total Strokes</span>
+                <span id="stat-total" class="text-2xl font-black text-stone-800">0</span>
+            </div>
+            <div class="text-center">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Thru Holes</span>
+                <span id="stat-thru" class="text-2xl font-black text-stone-800">0/18</span>
+            </div>
+        </section>
+
+        <!-- Tap Helper Note -->
+        <div class="text-center bg-emerald-50 border border-emerald-100 rounded-xl py-2 px-3">
+            <p class="text-xs text-emerald-800 font-medium">
+                <i class="fa-solid fa-circle-info mr-1"></i> Tap any hole row below to view its design & hazard layout!
+            </p>
+        </div>
+
+        <!-- Dynamic Scorecard List -->
+        <section class="bg-white rounded-2xl shadow-sm border border-stone-200 divide-y divide-stone-100 overflow-hidden">
+            <!-- Table Header -->
+            <div class="grid grid-cols-12 gap-1 px-4 py-3 bg-stone-50 text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+                <div class="col-span-4">Hole / Name</div>
+                <div class="col-span-2 text-center">Yds</div>
+                <div class="col-span-2 text-center">Par</div>
+                <div class="col-span-4 text-right pr-2">Strokes</div>
+            </div>
+            
+            <!-- Rows injected dynamically via JS -->
+            <div id="scorecard-list" class="divide-y divide-stone-100"></div>
+        </section>
+
+        <!-- Safety Double-Click Control Area -->
+        <section class="pt-2">
+            <button id="reset-btn" class="w-full py-4 rounded-xl text-stone-700 bg-stone-200 hover:bg-stone-300 font-bold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target">
+                <i class="fa-solid fa-arrow-rotate-left mr-2"></i>Start New Round
+            </button>
+        </section>
+
+    </main>
+
+    <!-- FLOATING INTERACTIVE HOLE DETAIL MODAL/DRAWER -->
+    <div id="hole-modal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-end justify-center hidden opacity-0 transition-opacity duration-300">
+        <!-- Close overlay trigger -->
+        <div class="absolute inset-0" onclick="closeHoleModal()"></div>
+        
+        <!-- Sheet Container -->
+        <div class="relative w-full max-w-md bg-white rounded-t-3xl shadow-2xl p-6 flex flex-col space-y-4 max-h-[92vh] overflow-y-auto transform translate-y-full transition-transform duration-300 z-10">
+            
+            <!-- Modal Pull bar / Handle -->
+            <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto -mt-2 mb-2"></div>
+
+            <!-- Header Row -->
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span id="modal-hole-number" class="text-xs font-bold uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">Hole 1</span>
+                        <span id="modal-hole-yards" class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">18 Yards</span>
+                    </div>
+                    <h2 id="modal-hole-name" class="text-2xl font-extrabold text-stone-900 mt-1">Front Patio Launch</h2>
+                </div>
+                <button onclick="closeHoleModal()" class="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 tap-target">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Detailed Overhead Vector Map Container -->
+            <div class="relative bg-golf-lawn rounded-2xl p-4 overflow-hidden border border-emerald-950/20 shadow-inner flex flex-col justify-between h-[280px]">
+                
+                <!-- Compass / Course Branding Details inside Canvas overlay -->
+                <div class="absolute top-3 left-3 flex flex-col space-y-0.5 pointer-events-none">
+                    <span class="text-[9px] font-black text-emerald-300 tracking-widest uppercase">Overhead view</span>
+                    <span id="modal-hole-par" class="text-white text-xs font-bold">Par 3</span>
+                </div>
+
+                <!-- Legend Indicator labels on top-right -->
+                <div class="absolute top-3 right-3 bg-black/40 backdrop-blur-md rounded-lg p-2 text-[10px] text-white space-y-1 pointer-events-none">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-3 h-2 bg-golf-gold rounded border border-white/40"></span>
+                        <span class="font-bold">Tee Box</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-2.5 h-2.5 bg-golf-pink rounded-full border border-white/40"></span>
+                        <span class="font-bold">Cup Target</span>
+                    </div>
+                </div>
+
+                <!-- Inline Dynamic SVG Graphic Canvas -->
+                <div id="svg-map-wrapper" class="w-full h-full flex items-center justify-center">
+                    <!-- Dynamic SVG injected by script -->
+                </div>
+
+            </div>
+
+            <!-- Sub-Modal Dashboard score controller for ease of use in the field -->
+            <div class="bg-stone-50 rounded-2xl p-4 border border-stone-100 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-stone-400 uppercase tracking-wider block">Your Score</span>
+                    <span class="text-xs text-stone-500">Tap buttons to adjust strokes</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Minus Button -->
+                    <button id="modal-score-minus" class="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-700 font-extrabold text-xl shadow-sm hover:bg-stone-100 tap-target">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <!-- Score Display -->
+                    <span id="modal-score-display" class="text-2xl font-black text-stone-900 w-10 text-center">-</span>
+                    <!-- Plus Button -->
+                    <button id="modal-score-plus" class="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-700 font-extrabold text-xl shadow-sm hover:bg-stone-100 tap-target">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Course Pro Tips -->
+            <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                <span class="text-[10px] font-bold text-amber-800 uppercase tracking-widest block mb-1">
+                    <i class="fa-solid fa-lightbulb mr-1"></i> Elmwood Pro-Tip
+                </span>
+                <p id="modal-hole-tip" class="text-xs text-amber-950 leading-relaxed font-medium">
+                    Chip soft off the brick pathway to let the ball feed directly toward the backyard hedge line.
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- SCRIPT APPLICATION CONTROLLER -->
+    <script>
+        // Full Course design specifications mapping to the original slides routing layouts.
+        // Tee boxes, pins and obstacles mapped coordinates correspond to canvas coordinates (width: 300, height: 240)
+        const ELMWOOD_COURSE = [
+            {
+                number: 1,
+                name: "Front Patio Launch",
+                par: 3,
+                yards: 18,
+                tip: "Launch directly off the front concrete patio threshold. Keep your line right of the main flowerbed to exploit the natural grassy feed slope.",
+                tee: { x: 30, y: 120, w: 24, h: 16 },
+                pin: { x: 250, y: 120 },
+                obstacles: [
+                    { type: "rect", x: 90, y: 30, w: 100, h: 40, label: "Concrete Stairs", color: "#94a3b8" },
+                    { type: "circle", x: 140, y: 160, r: 24, label: "Rose Bed", color: "#f43f5e" }
+                ],
+                path: "M 42 120 Q 140 100 250 120"
+            },
+            {
+                number: 2,
+                name: "Narrow Side Alley",
+                par: 3,
+                yards: 22,
+                tip: "A true corridor layout! Avoid the fence panels on the right. A low, rolling run-up is the safest way to find the pin.",
+                tee: { x: 30, y: 50, w: 16, h: 24 },
+                pin: { x: 260, y: 190 },
+                obstacles: [
+                    { type: "rect", x: 80, y: 0, w: 140, h: 40, label: "Garage Siding", color: "#cbd5e1" },
+                    { type: "rect", x: 0, y: 210, w: 300, h: 30, label: "Property Fence", color: "#854d0e" }
+                ],
+                path: "M 38 62 L 260 190"
+            },
+            {
+                number: 3,
+                name: "The Redwood Dogleg",
+                par: 3,
+                yards: 28,
+                tip: "You must curve your shot around the trunk. A soft float over the roots can land safely, but watch out for loose mulch lying beneath.",
+                tee: { x: 40, y: 200, w: 24, h: 16 },
+                pin: { x: 240, y: 50 },
+                obstacles: [
+                    { type: "circle", x: 140, y: 130, r: 35, label: "Redwood Trunk", color: "#166534" }
+                ],
+                path: "M 52 208 Q 90 90 240 50"
+            },
+            {
+                number: 4,
+                name: "Pool Deck Carry",
+                par: 3,
+                yards: 32,
+                tip: "High stakes! You must clear the concrete pool apron fully. Under-hitting lands on brick; over-hitting feeds into the back hedge.",
+                tee: { x: 30, y: 120, w: 24, h: 16 },
+                pin: { x: 250, y: 120 },
+                obstacles: [
+                    { type: "rect", x: 80, y: 50, w: 120, h: 140, label: "Swimming Pool Apron", color: "#38bdf8" }
+                ],
+                path: "M 42 120 L 250 120"
+            },
+            {
+                number: 5,
+                name: "AC Compressor Corner",
+                par: 3,
+                yards: 14,
+                tip: "A tight chip requiring pinpoint accuracy. Keep the shot low and straight; hitting the metallic hummer unit will send your ball deep out of bounds.",
+                tee: { x: 40, y: 190, w: 24, h: 16 },
+                pin: { x: 240, y: 50 },
+                obstacles: [
+                    { type: "rect", x: 110, y: 110, w: 60, h: 60, label: "AC Condenser", color: "#475569" }
+                ],
+                path: "M 52 198 Q 180 180 240 50"
+            },
+            {
+                number: 6,
+                name: "The Garden Wall Drop",
+                par: 3,
+                yards: 20,
+                tip: "Pitch from high terrace to lower lawn over the timber sleepers. Catch it high to stick the landing before rolling beyond the drop-line.",
+                tee: { x: 30, y: 60, w: 24, h: 16 },
+                pin: { x: 250, y: 180 },
+                obstacles: [
+                    { type: "rect", x: 100, y: 0, w: 30, h: 240, label: "Timber Retaining Wall", color: "#78350f" }
+                ],
+                path: "M 42 68 Q 150 120 250 180"
+            },
+            {
+                number: 7,
+                name: "Walkway Runway",
+                par: 3,
+                yards: 19,
+                tip: "Aim right along the stone pathway joints. A ball landing cleanly on the flagstone brick gets a huge forward bounce, so play it half-distance.",
+                tee: { x: 35, y: 120, w: 24, h: 16 },
+                pin: { x: 250, y: 120 },
+                obstacles: [
+                    { type: "rect", x: 90, y: 105, w: 100, h: 30, label: "Flagstone Path", color: "#ea580c" }
+                ],
+                path: "M 47 120 L 250 120"
+            },
+            {
+                number: 8,
+                name: "Dog Kennel Run",
+                par: 3,
+                yards: 25,
+                tip: "Watch the angle on this short blind dogleg. Avoid clipping the kennel enclosure on the left. Leave yourself a straightforward approach.",
+                tee: { x: 40, y: 200, w: 24, h: 16 },
+                pin: { x: 240, y: 60 },
+                obstacles: [
+                    { type: "rect", x: 90, y: 120, w: 80, h: 60, label: "Kennel Area", color: "#854d0e" }
+                ],
+                path: "M 52 208 Q 190 200 240 60"
+            },
+            {
+                number: 9,
+                name: "Central Lawn Finale",
+                par: 3,
+                yards: 35,
+                tip: "The layout opens up on the grand lawn, but the fire pit acts as an intimidating hazard right in the center. Fly it directly to the green.",
+                tee: { x: 30, y: 120, w: 24, h: 16 },
+                pin: { x: 260, y: 120 },
+                obstacles: [
+                    { type: "circle", x: 140, y: 120, r: 25, label: "Fire Pit Ring", color: "#dc2626" }
+                ],
+                path: "M 42 120 Q 140 60 260 120"
+            },
+            // Mapping Back Nine (10-18) beautifully as strategic layout reverses/variants of the Front Nine routing
+            {
+                number: 10,
+                name: "The Reverse Patio",
+                par: 3,
+                yards: 18,
+                tip: "Playing back towards the patio steps. Use the raised garden sleeper walls as a backstop cushion to bounce your shot right into the pin.",
+                tee: { x: 250, y: 120, w: 24, h: 16 },
+                pin: { x: 40, y: 120 },
+                obstacles: [
+                    { type: "rect", x: 90, y: 170, w: 100, h: 40, label: "Concrete Stairs", color: "#94a3b8" },
+                    { type: "circle", x: 140, y: 70, r: 24, label: "Rose Bed", color: "#f43f5e" }
+                ],
+                path: "M 250 120 L 40 120"
+            },
+            {
+                number: 11,
+                name: "Alley Return",
+                par: 3,
+                yards: 22,
+                tip: "The reverse corridor. Aim tight down the property boundary fence line, using the yard seam to steer the ball home.",
+                tee: { x: 260, y: 190, w: 16, h: 24 },
+                pin: { x: 30, y: 50 },
+                obstacles: [
+                    { type: "rect", x: 80, y: 0, w: 140, h: 40, label: "Garage Siding", color: "#cbd5e1" },
+                    { type: "rect", x: 0, y: 210, w: 300, h: 30, label: "Property Fence", color: "#854d0e" }
+                ],
+                path: "M 260 190 L 30 50"
+            },
+            {
+                number: 12,
+                name: "Redwood Wrap",
+                par: 3,
+                yards: 28,
+                tip: "Requires a delicate right-to-left slice profile around the giant tree trunk base. Keep your shot low under the weeping pine needles.",
+                tee: { x: 240, y: 50, w: 24, h: 16 },
+                pin: { x: 40, y: 200 },
+                obstacles: [
+                    { type: "circle", x: 140, y: 130, r: 35, label: "Redwood Trunk", color: "#166534" }
+                ],
+                path: "M 240 50 Q 150 50 40 200"
+            },
+            {
+                number: 13,
+                name: "The Blue Lagoon Clear",
+                par: 3,
+                yards: 32,
+                tip: "Aim deep and catch it high. Clearing the pool water is mandatory. A conservative shot right onto the gravel is a smart safety buffer.",
+                tee: { x: 250, y: 120, w: 24, h: 16 },
+                pin: { x: 30, y: 120 },
+                obstacles: [
+                    { type: "rect", x: 80, y: 50, w: 120, h: 140, label: "Swimming Pool Apron", color: "#38bdf8" }
+                ],
+                path: "M 250 120 L 30 120"
+            },
+            {
+                number: 14,
+                name: "AC Compressor Hook",
+                par: 3,
+                yards: 14,
+                tip: "Dribble the shot around the house foundation corner. Watch out for plumbing pipes sticking out near the condenser frame.",
+                tee: { x: 240, y: 50, w: 24, h: 16 },
+                pin: { x: 40, y: 190 },
+                obstacles: [
+                    { type: "rect", x: 110, y: 110, w: 60, h: 60, label: "AC Condenser", color: "#475569" }
+                ],
+                path: "M 240 50 Q 80 80 40 190"
+            },
+            {
+                number: 15,
+                name: "The Terrace Rise",
+                par: 3,
+                yards: 20,
+                tip: "Uphill chip over the timber retaining wall. A strong stroke is critical to stop the ball from sliding right back down the wooden embankment slope.",
+                tee: { x: 250, y: 180, w: 24, h: 16 },
+                pin: { x: 30, y: 60 },
+                obstacles: [
+                    { type: "rect", x: 100, y: 0, w: 30, h: 240, label: "Timber Retaining Wall", color: "#78350f" }
+                ],
+                path: "M 250 180 Q 150 120 30 60"
+            },
+            {
+                number: 16,
+                name: "Brick Bounce Return",
+                par: 3,
+                yards: 19,
+                tip: "Bank your shot off the garden bed edging block wall on the left side to redirect your ball cleanly into the tight fairway lane.",
+                tee: { x: 250, y: 120, w: 24, h: 16 },
+                pin: { x: 35, y: 120 },
+                obstacles: [
+                    { type: "rect", x: 90, y: 105, w: 100, h: 30, label: "Flagstone Path", color: "#ea580c" }
+                ],
+                path: "M 250 120 L 35 120"
+            },
+            {
+                number: 17,
+                name: "Kennel Curve Edge",
+                par: 3,
+                yards: 25,
+                tip: "Keep right to dodge the metal cage enclosure framing on the corner. Aim for the soft mulched area to settle your roll-up pace.",
+                tee: { x: 240, y: 60, w: 24, h: 16 },
+                pin: { x: 40, y: 200 },
+                obstacles: [
+                    { type: "rect", x: 90, y: 120, w: 80, h: 60, label: "Kennel Area", color: "#854d0e" }
+                ],
+                path: "M 240 60 L 40 200"
+            },
+            {
+                number: 18,
+                name: "The Grand Finale Home",
+                par: 3,
+                yards: 35,
+                tip: "Take a full, loose swing. Fly your final ball clean over the fire pit ring directly onto the target lawn spot right in front of the main viewing deck.",
+                tee: { x: 260, y: 120, w: 24, h: 16 },
+                pin: { x: 30, y: 120 },
+                obstacles: [
+                    { type: "circle", x: 140, y: 120, r: 25, label: "Fire Pit Ring", color: "#dc2626" }
+                ],
+                path: "M 260 120 Q 140 180 30 120"
+            }
+        ];
+
+        const CACHE_STORAGE_KEY = 'elmwood_pwa_score_v2';
+        let scorecardData = {};
+        let activeHoleNumber = null;
+        let isResetArmed = false;
+
+        // UI Nodes Cache
+        const listContainer = document.getElementById('scorecard-list');
+        const statToPar = document.getElementById('stat-to-par');
+        const statTotal = document.getElementById('stat-total');
+        const statThru = document.getElementById('stat-thru');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Modal Elements Cache
+        const holeModal = document.getElementById('hole-modal');
+        const modalContent = holeModal.querySelector('.relative');
+        const modalHoleNo = document.getElementById('modal-hole-number');
+        const modalHoleYards = document.getElementById('modal-hole-yards');
+        const modalHoleName = document.getElementById('modal-hole-name');
+        const modalHolePar = document.getElementById('modal-hole-par');
+        const modalHoleTip = document.getElementById('modal-hole-tip');
+        const modalScoreDisplay = document.getElementById('modal-score-display');
+        const svgMapWrapper = document.getElementById('svg-map-wrapper');
+
+        // Initial App setup
+        function initApp() {
+            loadCachedScores();
+            buildScorecardTable();
+            calculateOverallStats();
+            setupEventListeners();
+        }
+
+        // Fetch scores instantly from user's browser device hardware storage
+        function loadCachedScores() {
+            const cached = localStorage.getItem(CACHE_STORAGE_KEY);
+            if (cached) {
+                try {
+                    scorecardData = JSON.parse(cached);
+                } catch (err) {
+                    scorecardData = {};
+                }
+            } else {
+                scorecardData = {};
+            }
+        }
+
+        // Output scorecard template rows matching target iPhone styling sizing
+        function buildScorecardTable() {
+            listContainer.innerHTML = '';
+            ELMWOOD_COURSE.forEach(hole => {
+                const currentScore = scorecardData[hole.number] || 0;
+                const scoreDisplay = currentScore > 0 ? currentScore : '-';
+                const pillColor = currentScore > 0 ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-400';
+
+                const row = document.createElement('div');
+                row.className = "grid grid-cols-12 gap-1 px-4 py-3.5 items-center cursor-pointer hover:bg-stone-50 transition-colors tap-target";
+                row.setAttribute('data-hole-id', hole.number);
+                
+                row.innerHTML = `
+                    <div class="col-span-4 flex flex-col">
+                        <span class="font-extrabold text-stone-800 text-sm">Hole ${hole.number}</span>
+                        <span class="text-xs text-stone-400 font-medium truncate">${hole.name}</span>
+                    </div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500">${hole.yards}</div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500">P${hole.par}</div>
+                    <div class="col-span-4 flex justify-end pr-1">
+                        <span class="w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shadow-sm transition-all duration-200 ${pillColor}">
+                            ${scoreDisplay}
+                        </span>
+                    </div>
+                `;
+                
+                // Clicking a table row triggers detailed overhead graphic view modal
+                row.addEventListener('click', () => openHoleModal(hole.number));
+                listContainer.appendChild(row);
+            });
+        }
+
+        // Updates metrics
+        function calculateOverallStats() {
+            let totalStrokes = 0;
+            let thruCount = 0;
+            let totalParAtPlayedHoles = 0;
+
+            ELMWOOD_COURSE.forEach(hole => {
+                const s = scorecardData[hole.number] || 0;
+                if (s > 0) {
+                    totalStrokes += s;
+                    thruCount++;
+                    totalParAtPlayedHoles += hole.par;
+                }
+            });
+
+            statTotal.innerText = totalStrokes;
+            statThru.innerText = `${thruCount}/18`;
+
+            if (thruCount === 0) {
+                statToPar.innerText = 'E';
+                statToPar.className = "text-2xl font-black text-stone-800";
+            } else {
+                const parDiff = totalStrokes - totalParAtPlayedHoles;
+                if (parDiff === 0) {
+                    statToPar.innerText = 'E';
+                    statToPar.className = "text-2xl font-black text-stone-600";
+                } else if (parDiff > 0) {
+                    statToPar.innerText = `+${parDiff}`;
+                    statToPar.className = "text-2xl font-black text-red-600";
+                } else {
+                    statToPar.innerText = `${parDiff}`;
+                    statToPar.className = "text-2xl font-black text-emerald-600";
+                }
+            }
+        }
+
+        // Modify individual hole metrics from overlay interface panels
+        function adjustScore(holeNum, delta) {
+            const holeDef = ELMWOOD_COURSE.find(h => h.number === holeNum);
+            let score = scorecardData[holeNum] || 0;
+
+            if (score === 0) {
+                // Instantly initializes score values directly around target par index
+                score = holeDef.par;
+            } else {
+                score += delta;
+            }
+
+            // Cap floor limit on physical golf strokes index at 1
+            if (score < 1) score = 1;
+
+            scorecardData[holeNum] = score;
+            localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(scorecardData));
+
+            // Run updates in real-time
+            buildScorecardTable();
+            calculateOverallStats();
+            
+            // Sync current active layout modal elements text metrics inside state views
+            if (activeHoleNumber === holeNum) {
+                modalScoreDisplay.innerText = score;
+            }
+        }
+
+        // Generator dynamic SVG map diagram layout for targeted course holes mapping
+        function generateOverheadSVG(hole) {
+            let obstaclesSVG = '';
+            
+            hole.obstacles.forEach(obs => {
+                if (obs.type === 'rect') {
+                    obstaclesSVG += `
+                        <g>
+                            <rect x="${obs.x}" y="${obs.y}" width="${obs.w}" height="${obs.h}" rx="6" fill="${obs.color}" stroke="#14532d" stroke-width="2" opacity="0.95" />
+                            <text x="${obs.x + obs.w/2}" y="${obs.y + obs.h/2 + 4}" fill="#ffffff" font-size="9" font-family="sans-serif" font-weight="900" text-anchor="middle">${obs.label}</text>
+                        </g>
+                    `;
+                } else if (obs.type === 'circle') {
+                    obstaclesSVG += `
+                        <g>
+                            <circle cx="${obs.x}" cy="${obs.y}" r="${obs.r}" fill="${obs.color}" stroke="#14532d" stroke-width="2" opacity="0.95" />
+                            <text x="${obs.x}" y="${obs.y + 3}" fill="#ffffff" font-size="9" font-family="sans-serif" font-weight="900" text-anchor="middle">${obs.label}</text>
+                        </g>
+                    `;
+                }
+            });
+
+            return `
+                <svg viewBox="0 0 300 240" class="w-full h-full max-h-[220px]">
+                    <!-- Outer course bounds border dashed map grid -->
+                    <rect x="5" y="5" width="290" height="230" rx="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-dasharray="6,4" />
+                    
+                    <!-- Dotted swing guideline path -->
+                    <path d="${hole.path}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" stroke-dasharray="8,5" />
+                    
+                    <!-- Obstacles Layer -->
+                    ${obstaclesSVG}
+                    
+                    <!-- GOLD Rectangle Tee Box -->
+                    <g>
+                        <rect x="${hole.tee.x}" y="${hole.tee.y}" width="${hole.tee.w}" height="${hole.tee.h}" rx="2" fill="#d4af37" stroke="#ffffff" stroke-width="1.5" />
+                        <text x="${hole.tee.x + hole.tee.w/2}" y="${hole.tee.y + hole.tee.h/2 + 3.5}" fill="#1e1b4b" font-size="8" font-weight="900" text-anchor="middle">TEE</text>
+                    </g>
+                    
+                    <!-- PINK Circle Target Cup with mini flagstick line -->
+                    <g>
+                        <!-- Flagstick shadow line -->
+                        <line x1="${hole.pin.x}" y1="${hole.pin.y}" x2="${hole.pin.x}" y2="${hole.pin.y - 18}" stroke="#ffffff" stroke-width="2.5" />
+                        <!-- Flag banner -->
+                        <polygon points="${hole.pin.x},${hole.pin.y - 18} ${hole.pin.x - 12},${hole.pin.y - 14} ${hole.pin.x},${hole.pin.y - 10}" fill="#ff1493" />
+                        <!-- Target pin cup ring on ground -->
+                        <circle cx="${hole.pin.x}" cy="${hole.pin.y}" r="9" fill="#ff1493" stroke="#ffffff" stroke-width="1.5" />
+                        <circle cx="${hole.pin.x}" cy="${hole.pin.y}" r="3" fill="#ffffff" />
+                    </g>
+                </svg>
+            `;
+        }
+
+        // Open detailed layout view overlay
+        function openHoleModal(holeId) {
+            const holeDef = ELMWOOD_COURSE.find(h => h.number === holeId);
+            if (!holeDef) return;
+
+            activeHoleNumber = holeId;
+            abortResetSequence(); // Automatically dismisses active app reset prompt if user targets layout maps
+
+            // Map data items into display controls
+            modalHoleNo.innerText = `Hole ${holeDef.number}`;
+            modalHoleYards.innerText = `${holeDef.yards} Yards`;
+            modalHoleName.innerText = holeDef.name;
+            modalHolePar.innerText = `Par ${holeDef.par}`;
+            modalHoleTip.innerText = holeDef.tip;
+
+            const score = scorecardData[holeId] || 0;
+            modalScoreDisplay.innerText = score > 0 ? score : '-';
+
+            // Generate map markup
+            svgMapWrapper.innerHTML = generateOverheadSVG(holeDef);
+
+            // Activate slide anim transitions
+            holeModal.classList.remove('hidden');
+            // Allow CSS transitions engine loop cycle execution
+            setTimeout(() => {
+                holeModal.classList.remove('opacity-0');
+                modalContent.classList.remove('translate-y-full');
+            }, 15);
+        }
+
+        // Close layout drawer overlays
+        function closeHoleModal() {
+            activeHoleNumber = null;
+            holeModal.classList.add('opacity-0');
+            modalContent.classList.add('translate-y-full');
+            
+            // Clean dynamic structures fully when transitions end
+            setTimeout(() => {
+                holeModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // Configure event interactions
+        function setupEventListeners() {
+            // Setup interactive adjustment scoring controls on modal display panels
+            document.getElementById('modal-score-plus').addEventListener('click', () => {
+                if (activeHoleNumber) adjustScore(activeHoleNumber, 1);
+            });
+
+            document.getElementById('modal-score-minus').addEventListener('click', () => {
+                if (activeHoleNumber) adjustScore(activeHoleNumber, -1);
+            });
+
+            // Double Click Arming Safety Mechanism integration
+            resetBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Avoid triggering global bubble background dismissal events
+                
+                if (!isResetArmed) {
+                    isResetArmed = true;
+                    resetBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i>Wipe Board? Tap Again!';
+                    resetBtn.className = "w-full py-4 rounded-xl text-white bg-red-800 hover:bg-red-900 font-extrabold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target";
+                } else {
+                    // Confirmed wipe signal sequence triggered
+                    scorecardData = {};
+                    localStorage.removeItem(CACHE_STORAGE_KEY);
+                    buildScorecardTable();
+                    calculateOverallStats();
+                    abortResetSequence();
+                }
+            });
+
+            // Standard cancellation boundary - tapping anywhere safe-aborts active reset states
+            document.addEventListener('click', () => {
+                if (isResetArmed) {
+                    abortResetSequence();
+                }
+            });
+        }
+
+        // Cancel and revert armed states safely
+        function abortResetSequence() {
+            isResetArmed = false;
+            resetBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left mr-2"></i>Start New Round';
+            resetBtn.className = "w-full py-4 rounded-xl text-stone-700 bg-stone-200 hover:bg-stone-300 font-bold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target";
+        }
+
+        // Initialize state engine on window frame completion
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
