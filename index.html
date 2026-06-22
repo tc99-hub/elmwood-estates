@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Elmwood Estates Scorecard Builder</title>
+    <!-- Tailwind CSS for high-fidelity responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for standard iOS-style vector iconography -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        golf: {
+                            gold: '#d4af37',
+                            pink: '#ff1493',
+                            lawn: '#15803d',
+                            fairway: '#22c55e',
+                            darkGreen: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Optimizing viewport rendering configurations for native iOS layout presentation */
+        body {
+            -webkit-overflow-scrolling: touch;
+            user-select: none;
+            -webkit-user-select: none;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        .tap-target:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+        /* Elegant smooth scrollbar mapping for responsive scroll tables */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-900 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- Header Navigation Shell -->
+    <header class="bg-golf-darkGreen text-white py-4 px-4 sticky top-0 z-40 shadow-md">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-flag text-golf-gold text-lg animate-bounce"></i>
+                <div>
+                    <h1 class="font-extrabold text-base tracking-wide leading-none">ELMWOOD ESTATES</h1>
+                    <span class="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">San Ramon, CA</span>
+                </div>
+            </div>
+            <!-- Course Architect Configuration Activator -->
+            <button onclick="toggleArchitectMode()" class="bg-emerald-800 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors tap-target">
+                <i class="fa-solid fa-gears text-golf-gold"></i>
+                <span>Edit Course Data</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Primary Content Frame -->
+    <main class="flex-grow w-full max-w-md mx-auto px-4 py-4 flex flex-col space-y-4">
+        
+        <!-- Live Play Activity Monitor Panel -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 grid grid-cols-3 gap-2">
+            <div class="text-center border-r border-stone-100">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">To Par</span>
+                <span id="stat-to-par" class="text-2xl font-black text-stone-800">E</span>
+            </div>
+            <div class="text-center border-r border-stone-100">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Total Strokes</span>
+                <span id="stat-total" class="text-2xl font-black text-stone-800 font-mono">0</span>
+            </div>
+            <div class="text-center">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Thru Holes</span>
+                <span id="stat-thru" class="text-2xl font-black text-stone-800 font-mono">0/18</span>
+            </div>
+        </section>
+
+        <!-- Dynamic User Prompt Frame -->
+        <div class="text-center bg-emerald-50 border border-emerald-100 rounded-xl py-2 px-3">
+            <p class="text-xs text-emerald-800 font-medium">
+                <i class="fa-solid fa-circle-info mr-1 text-golf-gold"></i> Tap a hole row below to view its layout slide & log scores!
+            </p>
+        </div>
+
+        <!-- Responsive Scorecard Frame -->
+        <section class="bg-white rounded-2xl shadow-sm border border-stone-200 divide-y divide-stone-100 overflow-hidden">
+            <div class="grid grid-cols-12 gap-1 px-4 py-3 bg-stone-50 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                <div class="col-span-4">Hole / Name</div>
+                <div class="col-span-2 text-center">Yards</div>
+                <div class="col-span-2 text-center">Par</div>
+                <div class="col-span-2 text-center">HDCP</div>
+                <div class="col-span-2 text-right pr-2">Score</div>
+            </div>
+            <div id="scorecard-list" class="divide-y divide-stone-100">
+                <!-- Javascript builds data cells in real-time -->
+            </div>
+        </section>
+
+        <!-- Double-Click Safety Reset Area -->
+        <section class="pt-2">
+            <button id="reset-btn" class="w-full py-4 rounded-xl text-stone-700 bg-stone-200 hover:bg-stone-300 font-bold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target">
+                <i class="fa-solid fa-arrow-rotate-left mr-2"></i>Start New Round
+            </button>
+        </section>
+
+    </main>
+
+    <!-- HOLE DETAIL MODAL / SLIDE PREVIEW OVERLAY -->
+    <div id="hole-modal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-end justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="absolute inset-0" onclick="closeHoleModal()"></div>
+        
+        <div class="relative w-full max-w-md bg-white rounded-t-3xl shadow-2xl p-6 flex flex-col space-y-4 max-h-[95vh] overflow-y-auto transform translate-y-full transition-transform duration-300 z-10">
+            <!-- Pull Handle -->
+            <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto -mt-2 mb-2"></div>
+
+            <!-- Metadata Header Panel -->
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span id="modal-hole-number" class="text-xs font-bold uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">Hole 1</span>
+                        <span id="modal-hole-yards" class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">18 Yards</span>
+                        <span id="modal-hole-hdcp" class="text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full">HDCP 1</span>
+                    </div>
+                    <h2 id="modal-hole-name" class="text-xl font-extrabold text-stone-900 mt-1">Front Patio Launch</h2>
+                </div>
+                <button onclick="closeHoleModal()" class="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 tap-target">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Clean Non-Interactive Map Slide Frame -->
+            <div class="relative bg-golf-lawn rounded-2xl overflow-hidden border border-emerald-950/20 shadow-inner flex flex-col justify-between h-[260px]">
+                <div class="absolute top-3 left-3 flex flex-col space-y-1.5 z-10">
+                    <span id="modal-hole-par" class="text-white text-xs font-bold bg-black/40 px-2 py-1 rounded-md">Par 3</span>
+                </div>
+
+                <!-- Slide Image Base Container -->
+                <div class="absolute inset-0 w-full h-full flex items-center justify-center bg-golf-lawn z-0" id="map-background-container">
+                    <!-- Images uploaded in Architect Mode render here dynamically -->
+                </div>
+            </div>
+
+            <!-- Score Control Pad -->
+            <div class="bg-stone-50 rounded-2xl p-4 border border-stone-100 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-stone-400 uppercase tracking-wider block">Your Score</span>
+                    <span class="text-[11px] text-stone-500">Tap buttons to adjust strokes</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="modal-score-minus" class="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-700 font-extrabold text-xl shadow-sm hover:bg-stone-100 tap-target">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <span id="modal-score-display" class="text-2xl font-black text-stone-900 w-10 text-center">-</span>
+                    <button id="modal-score-plus" class="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-700 font-extrabold text-xl shadow-sm hover:bg-stone-100 tap-target">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pro-Tip Description Overlay -->
+            <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                <span class="text-[10px] font-bold text-amber-800 uppercase tracking-widest block mb-1">
+                    <i class="fa-solid fa-lightbulb mr-1 text-golf-gold"></i> Elmwood Pro-Tip
+                </span>
+                <p id="modal-hole-tip" class="text-xs text-amber-950 leading-relaxed font-medium">
+                    --
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- COURSE ARCHITECT / PARAMETER SETUP MODULE -->
+    <div id="architect-panel" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-end justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="absolute inset-0" onclick="toggleArchitectMode()"></div>
+        
+        <div class="relative w-full max-w-xl bg-white rounded-t-3xl shadow-2xl p-5 flex flex-col space-y-4 max-h-[92vh] transform translate-y-full transition-transform duration-300 z-10">
+            <!-- Drag Handle Bar -->
+            <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto -mt-2 mb-1"></div>
+
+            <div class="flex justify-between items-center flex-wrap gap-2">
+                <div>
+                    <h2 class="text-lg font-extrabold text-stone-900"><i class="fa-solid fa-gears text-golf-gold mr-1.5"></i>Course Architect Mode</h2>
+                    <p class="text-xs text-stone-500">Edit course yardages, par values, and upload images of the hole layouts!</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="exportCourseConfiguration()" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 transition-colors tap-target">
+                        <i class="fa-solid fa-code-branch"></i>
+                        <span>Export Code</span>
+                    </button>
+                    <button onclick="toggleArchitectMode()" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold tap-target">
+                        Done
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Scroll Table of Editable Elements -->
+            <div class="overflow-x-auto flex-grow max-h-[45vh] border border-stone-200 rounded-xl bg-stone-50">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-stone-100 border-b border-stone-200 sticky top-0 z-20">
+                            <th class="p-2.5 font-bold text-stone-600 w-12">Hole</th>
+                            <th class="p-2.5 font-bold text-stone-600">Hole Name</th>
+                            <th class="p-2.5 font-bold text-stone-600 w-16">Par</th>
+                            <th class="p-2.5 font-bold text-stone-600 w-18">Yards</th>
+                            <th class="p-2.5 font-bold text-stone-600 w-16">HDCP</th>
+                            <th class="p-2.5 font-bold text-stone-600">Layout Shape / Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="architect-table-body" class="divide-y divide-stone-200 bg-white">
+                        <!-- Content auto-injected by JS engine -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Exportable Code Output Shell -->
+            <div id="export-container" class="hidden bg-stone-900 rounded-xl p-3 text-left relative flex flex-col space-y-2">
+                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">
+                    <i class="fa-solid fa-lock mr-1"></i> Your Custom Design Code (JSON)
+                </span>
+                <p class="text-[10px] text-stone-400 leading-normal">
+                    Copy this code block, then replace the default configuration block inside your offline HTML file to save it permanently!
+                </p>
+                <textarea id="export-textarea" readonly class="w-full h-24 bg-stone-950 border border-stone-800 text-emerald-400 font-mono text-[9px] p-2 rounded focus:outline-none"></textarea>
+                <div class="flex justify-between items-center">
+                    <span id="export-copy-status" class="text-[10px] text-emerald-500 font-bold"></span>
+                    <button onclick="copyExportedCode()" class="bg-stone-800 hover:bg-stone-700 text-white text-[10px] px-3 py-1 rounded font-bold tap-target">
+                        <i class="fa-solid fa-copy mr-1"></i>Copy Code
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
+                <i class="fa-solid fa-image text-emerald-600 mt-0.5"></i>
+                <div>
+                    <span class="font-bold block">Mobile Upload Support:</span>
+                    Take photographs of your printed layout slides or upload cropped screenshots directly from your device file manager!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Local Cache Key Settings
+        const CONFIG_CACHE_KEY = 'elmwood_custom_architect_config';
+        const SCORE_CACHE_KEY = 'elmwood_custom_rounds_cache';
+
+        // High Fidelity Default Layout Template mapping slide requirements
+        const DEFAULT_COURSE = [
+            { number: 1, name: "Front Patio Launch", par: 3, yards: 18, hdcp: 11, tip: "Mind the brick drop-off. Aim slightly left of the drain path.", image: null },
+            { number: 2, name: "The Grassway Canopy", par: 3, yards: 22, hdcp: 3, tip: "Watch the overhanging foliage. Low putts avoid canopy deflections.", image: null },
+            { number: 3, name: "Redwood Corner", par: 4, yards: 31, hdcp: 1, tip: "A sharp dogleg around the massive trunk. Placing your tee shot is key.", image: null },
+            { number: 4, name: "AC Unit Chute", par: 3, yards: 15, hdcp: 13, tip: "Tight alleyway near the cooling fan. Keep it straight and low.", image: null },
+            { number: 5, name: "Walkway Bypass", par: 3, yards: 19, hdcp: 9, tip: "Uneven concrete pavers cause tricky breaks. Play for the uphill rebound.", image: null },
+            { number: 6, name: "Poolside Ridge", par: 3, yards: 25, hdcp: 7, tip: "OB water risk directly right. A conservative shot up the left safe zone is smart.", image: null },
+            { number: 7, name: "The Breezeway Gap", par: 4, yards: 33, hdcp: 5, tip: "Wind tunnel corridor. Hard surface bounces might run long.", image: null },
+            { number: 8, name: "Planter Wall Ramp", par: 3, yards: 17, hdcp: 15, tip: "Steep vertical elevation. Carry the stone ledge with confidence.", image: null },
+            { number: 9, name: "The Back Yard Turn", par: 3, yards: 20, hdcp: 17, tip: "Deep grass section. Expect slow roll conditions approaching the cup.", image: null },
+            { number: 10, name: "Shedside Dogleg", par: 4, yards: 28, hdcp: 2, tip: "Avoid the storage shed roof structure. Play wide and let it feed.", image: null },
+            { number: 11, name: "Hedge Alley", par: 3, yards: 16, hdcp: 14, tip: "Lush green boundaries on both sides. Straight putts only.", image: null },
+            { number: 12, name: "The Concrete Slip", par: 3, yards: 21, hdcp: 8, tip: "Slick concrete walkway surface speeds up play drastically. Soft touch required.", image: null },
+            { number: 13, name: "Oak Shade Hollow", par: 3, yards: 19, hdcp: 12, tip: "Uneven roots and dirt hazards. Steer clear of the tree center.", image: null },
+            { number: 14, name: "The Fire Pit Loop", par: 3, yards: 24, hdcp: 6, tip: "Challenging circular gravel obstacle in the center. Play around either side.", image: null },
+            { number: 15, name: "Garden Fence Boundary", par: 4, yards: 29, hdcp: 4, tip: "Tight boundaries on the right fence. Lay up short of the narrow pass.", image: null },
+            { number: 16, name: "Driveway Slicks", par: 3, yards: 18, hdcp: 18, tip: "Fast hardtop pavement. Aim for the expansion joints to grab speed control.", image: null },
+            { number: 17, name: "Rose Garden Pitch", par: 3, yards: 14, hdcp: 16, tip: "Fragile surrounding bushes. Keep it low to prevent lost ball scenarios.", image: null },
+            { number: 18, name: "Home Patio Return", par: 4, yards: 35, hdcp: 10, tip: "The ultimate finale. Carry the stone transition onto the main patio finish.", image: null }
+        ];
+
+        let scorecardData = {};
+        let courseConfiguration = [];
+        let activeHoleNumber = null;
+        let isResetArmed = false;
+        let isArchitectOpen = false;
+
+        // Dom Queries
+        const listContainer = document.getElementById('scorecard-list');
+        const statToPar = document.getElementById('stat-to-par');
+        const statTotal = document.getElementById('stat-total');
+        const statThru = document.getElementById('stat-thru');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Detail Modal Caching
+        const holeModal = document.getElementById('hole-modal');
+        const modalContent = holeModal.querySelector('.relative');
+        const modalHoleNo = document.getElementById('modal-hole-number');
+        const modalHoleYards = document.getElementById('modal-hole-yards');
+        const modalHoleHdcp = document.getElementById('modal-hole-hdcp');
+        const modalHoleName = document.getElementById('modal-hole-name');
+        const modalHolePar = document.getElementById('modal-hole-par');
+        const modalHoleTip = document.getElementById('modal-hole-tip');
+        const modalScoreDisplay = document.getElementById('modal-score-display');
+        const mapBgContainer = document.getElementById('map-background-container');
+
+        // Architect Queries
+        const architectPanel = document.getElementById('architect-panel');
+        const architectPanelContent = architectPanel.querySelector('.relative');
+        const architectTableBody = document.getElementById('architect-table-body');
+
+        function initApp() {
+            loadCachedData();
+            buildScorecardTable();
+            buildArchitectTable();
+            calculateOverallStats();
+            setupEventListeners();
+        }
+
+        function loadCachedData() {
+            // Load custom metrics configuration
+            const savedConfig = localStorage.getItem(CONFIG_CACHE_KEY);
+            if (savedConfig) {
+                try {
+                    courseConfiguration = JSON.parse(savedConfig);
+                    // Standardize configuration elements to make sure they match all active properties
+                    courseConfiguration.forEach((h, index) => {
+                        if (h.hdcp === undefined) h.hdcp = index + 1;
+                        if (h.image === undefined) h.image = null;
+                    });
+                } catch (e) {
+                    courseConfiguration = JSON.parse(JSON.stringify(DEFAULT_COURSE));
+                }
+            } else {
+                courseConfiguration = JSON.parse(JSON.stringify(DEFAULT_COURSE));
+            }
+
+            // Load saved user score entries
+            const savedScores = localStorage.getItem(SCORE_CACHE_KEY);
+            if (savedScores) {
+                try {
+                    scorecardData = JSON.parse(savedScores);
+                } catch (e) {
+                    scorecardData = {};
+                }
+            } else {
+                scorecardData = {};
+            }
+        }
+
+        function buildScorecardTable() {
+            listContainer.innerHTML = '';
+            courseConfiguration.forEach(hole => {
+                const score = scorecardData[hole.number] || 0;
+                const scoreDisplay = score > 0 ? score : '-';
+                const scoreBgClass = score > 0 ? 'bg-emerald-600 text-white font-black' : 'bg-stone-100 text-stone-400 font-bold';
+
+                const row = document.createElement('div');
+                row.className = "grid grid-cols-12 gap-1 px-4 py-3 items-center cursor-pointer hover:bg-stone-50 transition-colors tap-target";
+                row.setAttribute('data-hole-id', hole.number);
+                row.innerHTML = `
+                    <div class="col-span-4 flex flex-col">
+                        <span class="font-extrabold text-stone-800 text-sm">Hole ${hole.number}</span>
+                        <span class="text-xs text-stone-400 font-semibold truncate">${hole.name}</span>
+                    </div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500 font-mono">${hole.yards}</div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500 font-mono">P${hole.par}</div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500 font-mono">H${hole.hdcp}</div>
+                    <div class="col-span-2 flex justify-end pr-1">
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs shadow-sm transition-all duration-200 ${scoreBgClass}">
+                            ${scoreDisplay}
+                        </span>
+                    </div>
+                `;
+                row.addEventListener('click', () => openHoleModal(hole.number));
+                listContainer.appendChild(row);
+            });
+        }
+
+        function buildArchitectTable() {
+            architectTableBody.innerHTML = '';
+            courseConfiguration.forEach((hole, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-stone-200 hover:bg-stone-50 text-[11px]";
+                
+                // Set layout configuration checks
+                const imageButtonColor = hole.image ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-stone-100 text-stone-700 border-stone-300';
+                const imageButtonText = hole.image ? '<i class="fa-solid fa-check mr-1"></i>Hole Shape' : '<i class="fa-solid fa-image mr-1"></i>Upload Shape';
+
+                tr.innerHTML = `
+                    <td class="p-2 font-extrabold text-stone-700 font-mono">
+                        <input type="number" class="w-10 bg-white border border-stone-200 rounded px-1.5 py-1 text-center focus:outline-none focus:border-emerald-600 font-mono" value="${hole.number}" onchange="updateHoleConfig(${idx}, 'number', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <input type="text" class="w-full bg-white border border-stone-200 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-600 font-semibold text-stone-800" value="${hole.name}" onchange="updateHoleConfig(${idx}, 'name', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <select class="w-12 bg-white border border-stone-200 rounded px-1 py-1 focus:outline-none focus:border-emerald-600 font-mono" onchange="updateHoleConfig(${idx}, 'par', this.value)">
+                            <option value="2" ${hole.par == 2 ? 'selected' : ''}>P2</option>
+                            <option value="3" ${hole.par == 3 ? 'selected' : ''}>P3</option>
+                            <option value="4" ${hole.par == 4 ? 'selected' : ''}>P4</option>
+                            <option value="5" ${hole.par == 5 ? 'selected' : ''}>P5</option>
+                        </select>
+                    </td>
+                    <td class="p-2">
+                        <input type="number" class="w-14 bg-white border border-stone-200 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-600 font-mono" value="${hole.yards}" onchange="updateHoleConfig(${idx}, 'yards', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <input type="number" class="w-12 bg-white border border-stone-200 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-600 font-mono" value="${hole.hdcp}" onchange="updateHoleConfig(${idx}, 'hdcp', this.value)">
+                    </td>
+                    <td class="p-2 flex flex-col space-y-1.5 min-w-[140px]">
+                        <textarea class="w-full bg-white border border-stone-200 rounded px-1.5 py-1 focus:outline-none focus:border-emerald-600 leading-tight" rows="1" placeholder="Add pro-tips..." onchange="updateHoleConfig(${idx}, 'tip', this.value)">${hole.tip || ''}</textarea>
+                        
+                        <!-- Upload Section for Custom Hole Design Image -->
+                        <div class="flex items-center space-x-1">
+                            <input type="file" id="image-upload-${idx}" accept="image/*" class="hidden" onchange="processImageUpload(${idx}, event)">
+                            <button onclick="triggerHoleImageUpload(${idx})" class="px-2 py-1 rounded border ${imageButtonColor} font-bold text-[10px] flex items-center transition-all">
+                                ${imageButtonText}
+                            </button>
+                            ${hole.image ? `<button onclick="removeHoleImage(${idx})" class="text-red-500 hover:text-red-700 px-1 text-[10px]" title="Remove Image"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                        </div>
+                    </td>
+                `;
+                architectTableBody.appendChild(tr);
+            });
+        }
+
+        function triggerHoleImageUpload(idx) {
+            document.getElementById(`image-upload-${idx}`).click();
+        }
+
+        function processImageUpload(idx, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Scaling down base64 images so localstorage threshold constraints aren't exceeded
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Constrain viewport bounds
+                    const MAX_WIDTH = 500;
+                    const scale = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scale;
+                    
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Compress and save locally
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+                    courseConfiguration[idx].image = compressedDataUrl;
+                    
+                    saveConfig();
+                    buildArchitectTable();
+                    buildScorecardTable();
+                    
+                    if (activeHoleNumber === courseConfiguration[idx].number) {
+                        openHoleModal(activeHoleNumber);
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeHoleImage(idx) {
+            courseConfiguration[idx].image = null;
+            saveConfig();
+            buildArchitectTable();
+            buildScorecardTable();
+            if (activeHoleNumber === courseConfiguration[idx].number) {
+                openHoleModal(activeHoleNumber);
+            }
+        }
+
+        function updateHoleConfig(index, key, value) {
+            if (key === 'par' || key === 'yards' || key === 'hdcp' || key === 'number') {
+                courseConfiguration[index][key] = parseInt(value, 10) || 1;
+            } else {
+                courseConfiguration[index][key] = value;
+            }
+            saveConfig();
+            buildScorecardTable();
+            calculateOverallStats();
+        }
+
+        function saveConfig() {
+            localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(courseConfiguration));
+        }
+
+        function calculateOverallStats() {
+            let totalStrokes = 0;
+            let thruCount = 0;
+            let totalParAtPlayedHoles = 0;
+
+            courseConfiguration.forEach(hole => {
+                const s = scorecardData[hole.number] || 0;
+                if (s > 0) {
+                    totalStrokes += s;
+                    thruCount++;
+                    totalParAtPlayedHoles += hole.par;
+                }
+            });
+
+            statTotal.innerText = totalStrokes;
+            statThru.innerText = `${thruCount}/${courseConfiguration.length}`;
+
+            if (thruCount === 0) {
+                statToPar.innerText = 'E';
+                statToPar.className = "text-2xl font-black text-stone-800";
+            } else {
+                const parDiff = totalStrokes - totalParAtPlayedHoles;
+                if (parDiff === 0) {
+                    statToPar.innerText = 'E';
+                    statToPar.className = "text-2xl font-black text-stone-600";
+                } else if (parDiff > 0) {
+                    statToPar.innerText = `+${parDiff}`;
+                    statToPar.className = "text-2xl font-black text-red-600";
+                } else {
+                    statToPar.innerText = `${parDiff}`;
+                    statToPar.className = "text-2xl font-black text-emerald-600 font-mono";
+                }
+            }
+        }
+
+        function adjustScore(holeNum, delta) {
+            const holeDef = courseConfiguration.find(h => h.number === holeNum);
+            let score = scorecardData[holeNum] || 0;
+
+            if (score === 0) {
+                score = holeDef.par;
+            } else {
+                score += delta;
+            }
+
+            if (score < 1) score = 1;
+
+            scorecardData[holeNum] = score;
+            localStorage.setItem(SCORE_CACHE_KEY, JSON.stringify(scorecardData));
+
+            buildScorecardTable();
+            calculateOverallStats();
+            
+            if (activeHoleNumber === holeNum) {
+                modalScoreDisplay.innerText = score;
+            }
+        }
+
+        function openHoleModal(holeId) {
+            const holeDef = courseConfiguration.find(h => h.number === holeId);
+            if (!holeDef) return;
+
+            activeHoleNumber = holeId;
+            abortResetSequence();
+
+            modalHoleNo.innerText = `Hole ${holeDef.number}`;
+            modalHoleYards.innerText = `${holeDef.yards} Yards`;
+            modalHoleHdcp.innerText = `HDCP ${holeDef.hdcp || 18}`;
+            modalHoleName.innerText = holeDef.name;
+            modalHolePar.innerText = `Par ${holeDef.par}`;
+            modalHoleTip.innerText = holeDef.tip || 'Take normal practice strokes. Play for steady direction rather than speed.';
+
+            const score = scorecardData[holeId] || 0;
+            modalScoreDisplay.innerText = score > 0 ? score : '-';
+
+            // Background image processor (either custom slide background or green fallback)
+            if (holeDef.image) {
+                mapBgContainer.innerHTML = `<img src="${holeDef.image}" class="w-full h-full object-cover select-none pointer-events-none" />`;
+            } else {
+                mapBgContainer.innerHTML = `
+                    <div class="w-full h-full bg-gradient-to-b from-emerald-800 to-golf-darkGreen opacity-95 flex flex-col items-center justify-center p-4 text-center">
+                        <i class="fa-solid fa-mountain-sun text-white/10 text-7xl absolute"></i>
+                        <span class="text-white/40 text-xs font-semibold z-10">Upload custom slide layout inside Editor Mode</span>
+                    </div>
+                `;
+            }
+
+            // Active slide animations
+            holeModal.classList.remove('hidden');
+            setTimeout(() => {
+                holeModal.classList.remove('opacity-0');
+                modalContent.classList.remove('translate-y-full');
+            }, 15);
+        }
+
+        function closeHoleModal() {
+            activeHoleNumber = null;
+            holeModal.classList.add('opacity-0');
+            modalContent.classList.add('translate-y-full');
+            setTimeout(() => {
+                holeModal.classList.add('hidden');
+            }, 300);
+        }
+
+        function toggleArchitectMode() {
+            if (!isArchitectOpen) {
+                isArchitectOpen = true;
+                buildArchitectTable();
+                architectPanel.classList.remove('hidden');
+                setTimeout(() => {
+                    architectPanel.classList.remove('opacity-0');
+                    architectPanelContent.classList.remove('translate-y-full');
+                }, 15);
+            } else {
+                isArchitectOpen = false;
+                architectPanel.classList.add('opacity-0');
+                architectPanelContent.classList.add('translate-y-full');
+                setTimeout(() => {
+                    architectPanel.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function exportCourseConfiguration() {
+            const container = document.getElementById('export-container');
+            const textarea = document.getElementById('export-textarea');
+            const statusLabel = document.getElementById('export-copy-status');
+            
+            // Format configuration object for export paste actions
+            const formattedJS = JSON.stringify(courseConfiguration, null, 4);
+            textarea.value = formattedJS;
+            
+            statusLabel.innerText = '';
+            container.classList.remove('hidden');
+        }
+
+        function copyExportedCode() {
+            const textarea = document.getElementById('export-textarea');
+            const statusLabel = document.getElementById('export-copy-status');
+            
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); 
+            
+            try {
+                document.execCommand('copy');
+                statusLabel.innerText = 'Copied to clipboard!';
+                setTimeout(() => { statusLabel.innerText = ''; }, 3000);
+            } catch (err) {
+                statusLabel.innerText = 'Please manually select and copy.';
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('modal-score-plus').addEventListener('click', () => {
+                if (activeHoleNumber) adjustScore(activeHoleNumber, 1);
+            });
+
+            document.getElementById('modal-score-minus').addEventListener('click', () => {
+                if (activeHoleNumber) adjustScore(activeHoleNumber, -1);
+            });
+
+            // Double Click Safety Reset Processors
+            resetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!isResetArmed) {
+                    isResetArmed = true;
+                    resetBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i>Wipe Board? Tap Again!';
+                    resetBtn.className = "w-full py-4 rounded-xl text-white bg-red-800 hover:bg-red-900 font-extrabold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target";
+                } else {
+                    scorecardData = {};
+                    localStorage.removeItem(SCORE_CACHE_KEY);
+                    buildScorecardTable();
+                    calculateOverallStats();
+                    abortResetSequence();
+                }
+            });
+
+            // Tap out abort handler
+            document.addEventListener('click', () => {
+                if (isResetArmed) {
+                    abortResetSequence();
+                }
+            });
+        }
+
+        function abortResetSequence() {
+            isResetArmed = false;
+            resetBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left mr-2"></i>Start New Round';
+            resetBtn.className = "w-full py-4 rounded-xl text-stone-700 bg-stone-200 hover:bg-stone-300 font-bold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target";
+        }
+
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
