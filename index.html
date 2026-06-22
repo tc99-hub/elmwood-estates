@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Elmwood Estates Scorecard Builder</title>
+    <!-- Tailwind CSS for modern design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for high-quality iOS-like icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        golf: {
+                            gold: '#d4af37',
+                            pink: '#ff1493',
+                            lawn: '#15803d',
+                            fairway: '#22c55e',
+                            darkGreen: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Optimizing for mobile layout and touch performance */
+        body {
+            -webkit-overflow-scrolling: touch;
+            user-select: none;
+            -webkit-user-select: none;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        .tap-target:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+        /* Custom scrollbar for course configuration table */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-900 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- Header/Branding Bar -->
+    <header class="bg-golf-darkGreen text-white py-4 px-4 sticky top-0 z-40 shadow-md">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-flag text-golf-gold text-lg animate-bounce"></i>
+                <div>
+                    <h1 class="font-extrabold text-base tracking-wide leading-none">ELMWOOD ESTATES</h1>
+                    <span class="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">San Ramon, CA</span>
+                </div>
+            </div>
+            <!-- Course Architect Setup Toggle Button -->
+            <button onclick="toggleArchitectMode()" class="bg-emerald-800 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors tap-target">
+                <i class="fa-solid fa-gears text-golf-gold"></i>
+                <span>Edit Course Data</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content App Canvas -->
+    <main class="flex-grow w-full max-w-md mx-auto px-4 py-4 flex flex-col space-y-4">
+        
+        <!-- Live Round Dashboard Card -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 grid grid-cols-3 gap-2">
+            <div class="text-center border-r border-stone-100">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">To Par</span>
+                <span id="stat-to-par" class="text-2xl font-black text-stone-800">E</span>
+            </div>
+            <div class="text-center border-r border-stone-100">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Total Strokes</span>
+                <span id="stat-total" class="text-2xl font-black text-stone-800 font-mono">0</span>
+            </div>
+            <div class="text-center">
+                <span class="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Thru Holes</span>
+                <span id="stat-thru" class="text-2xl font-black text-stone-800 font-mono">0/18</span>
+            </div>
+        </section>
+
+        <!-- Touch Instruction Bar -->
+        <div class="text-center bg-emerald-50 border border-emerald-100 rounded-xl py-2 px-3">
+            <p class="text-xs text-emerald-800 font-medium">
+                <i class="fa-solid fa-circle-info mr-1 text-golf-gold"></i> Tap a hole row below to view map layout & enter scores!
+            </p>
+        </div>
+
+        <!-- Interactive Scorecard Grid Container -->
+        <section class="bg-white rounded-2xl shadow-sm border border-stone-200 divide-y divide-stone-100 overflow-hidden">
+            <div class="grid grid-cols-12 gap-1 px-4 py-3 bg-stone-50 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                <div class="col-span-5">Hole / Name</div>
+                <div class="col-span-2 text-center">Yards</div>
+                <div class="col-span-2 text-center">Par</div>
+                <div class="col-span-3 text-right pr-2">Score</div>
+            </div>
+            <div id="scorecard-list" class="divide-y divide-stone-100">
+                <!-- Rows injected dynamically -->
+            </div>
+        </section>
+
+        <!-- Safety Double-Click Control Area -->
+        <section class="pt-2">
+            <button id="reset-btn" class="w-full py-4 rounded-xl text-stone-700 bg-stone-200 hover:bg-stone-300 font-bold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target">
+                <i class="fa-solid fa-arrow-rotate-left mr-2"></i>Start New Round
+            </button>
+        </section>
+
+    </main>
+
+    <!-- INTERACTIVE HOLE DETAIL MODAL / DRAWER -->
+    <div id="hole-modal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-end justify-center hidden opacity-0 transition-opacity duration-300">
+        <!-- Close trigger overlay -->
+        <div class="absolute inset-0" onclick="closeHoleModal()"></div>
+        
+        <div class="relative w-full max-w-md bg-white rounded-t-3xl shadow-2xl p-6 flex flex-col space-y-4 max-h-[92vh] overflow-y-auto transform translate-y-full transition-transform duration-300 z-10">
+            <!-- Modal Pull handle -->
+            <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto -mt-2 mb-2"></div>
+
+            <!-- Title & Basic Metadata -->
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span id="modal-hole-number" class="text-xs font-bold uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">Hole 1</span>
+                        <span id="modal-hole-yards" class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">18 Yards</span>
+                    </div>
+                    <h2 id="modal-hole-name" class="text-xl font-extrabold text-stone-900 mt-1">Front Patio Launch</h2>
+                </div>
+                <button onclick="closeHoleModal()" class="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 tap-target">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Map Viewport (Interactive) -->
+            <div class="relative bg-golf-lawn rounded-2xl p-4 overflow-hidden border border-emerald-950/20 shadow-inner flex flex-col justify-between h-[260px]">
+                <div class="absolute top-3 left-3 flex flex-col space-y-0.5 pointer-events-none z-10">
+                    <span id="modal-hole-par" class="text-white text-xs font-bold bg-black/30 px-2 py-0.5 rounded-md">Par 3</span>
+                </div>
+
+                <!-- Live Map Legend -->
+                <div class="absolute top-3 right-3 bg-black/50 backdrop-blur-md rounded-lg p-2 text-[10px] text-white space-y-1 pointer-events-none z-10">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-3 h-2 bg-golf-gold rounded border border-white/40"></span>
+                        <span class="font-bold">Tee Box</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-2.5 h-2.5 bg-golf-pink rounded-full border border-white/40"></span>
+                        <span class="font-bold">Cup Target</span>
+                    </div>
+                </div>
+
+                <!-- Interactive SVG Graphic Canvas Area -->
+                <div id="svg-map-wrapper" class="w-full h-full flex items-center justify-center cursor-crosshair">
+                    <!-- Dynamic SVG Graphic Elements loaded here -->
+                </div>
+                
+                <div id="map-interaction-instructions" class="absolute bottom-2 left-0 right-0 text-center text-[9px] text-emerald-200 font-semibold pointer-events-none hidden">
+                    <span class="bg-black/40 px-2 py-1 rounded-full">Tap anywhere on the green to move the Pink Pin Cup!</span>
+                </div>
+            </div>
+
+            <!-- Score Adjuster Pad -->
+            <div class="bg-stone-50 rounded-2xl p-4 border border-stone-100 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-stone-400 uppercase tracking-wider block">Your Score</span>
+                    <span class="text-[11px] text-stone-500">Tap buttons to adjust strokes</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="modal-score-minus" class="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-700 font-extrabold text-xl shadow-sm hover:bg-stone-100 tap-target">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <span id="modal-score-display" class="text-2xl font-black text-stone-900 w-10 text-center">-</span>
+                    <button id="modal-score-plus" class="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-700 font-extrabold text-xl shadow-sm hover:bg-stone-100 tap-target">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pro-Tip Box -->
+            <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                <span class="text-[10px] font-bold text-amber-800 uppercase tracking-widest block mb-1">
+                    <i class="fa-solid fa-lightbulb mr-1 text-golf-gold"></i> Elmwood Pro-Tip
+                </span>
+                <p id="modal-hole-tip" class="text-xs text-amber-950 leading-relaxed font-medium">
+                    --
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- COURSE ARCHITECT / DATA EDITOR DRAWER -->
+    <div id="architect-panel" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-end justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="absolute inset-0" onclick="toggleArchitectMode()"></div>
+        
+        <div class="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl p-6 flex flex-col space-y-4 max-h-[92vh] transform translate-y-full transition-transform duration-300 z-10">
+            <!-- Pull Bar -->
+            <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto -mt-2 mb-2"></div>
+
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-lg font-extrabold text-stone-900"><i class="fa-solid fa-gears text-golf-gold mr-1.5"></i>Course Architect Mode</h2>
+                    <p class="text-xs text-stone-500">Edit course yardages, par values, and map targets here to match your Google slides!</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="exportCourseConfiguration()" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 transition-colors tap-target">
+                        <i class="fa-solid fa-code-branch"></i>
+                        <span>Export Code</span>
+                    </button>
+                    <button onclick="toggleArchitectMode()" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded-xl text-xs font-bold tap-target">
+                        Done
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table of editable parameters -->
+            <div class="overflow-x-auto flex-grow max-h-[40vh] border border-stone-200 rounded-xl">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-stone-100 border-b border-stone-200">
+                            <th class="p-3 font-bold text-stone-600">Hole</th>
+                            <th class="p-3 font-bold text-stone-600">Name</th>
+                            <th class="p-3 font-bold text-stone-600">Par</th>
+                            <th class="p-3 font-bold text-stone-600">Yards</th>
+                            <th class="p-3 font-bold text-stone-600">Pro-Tip / Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="architect-table-body" class="divide-y divide-stone-100">
+                        <!-- Content auto-injected by JS engine -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Code Export Area (Collapsible display) -->
+            <div id="export-container" class="hidden bg-stone-900 rounded-xl p-3 text-left relative flex flex-col space-y-2">
+                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">
+                    <i class="fa-solid fa-lock mr-1"></i> Your Custom Design Code (JSON)
+                </span>
+                <p class="text-[10px] text-stone-400 leading-normal">
+                    Copy the code below, then open your HTML source code and replace the <strong>DEFAULT_COURSE</strong> array (lines ~138-157) with this block to lock it in forever!
+                </p>
+                <textarea id="export-textarea" readonly class="w-full h-32 bg-stone-950 border border-stone-800 text-emerald-400 font-mono text-[10px] p-2 rounded focus:outline-none"></textarea>
+                <div class="flex justify-between items-center">
+                    <span id="export-copy-status" class="text-[10px] text-emerald-500 font-bold"></span>
+                    <button onclick="copyExportedCode()" class="bg-stone-800 hover:bg-stone-700 text-white text-[10px] px-3 py-1 rounded font-bold tap-target">
+                        <i class="fa-solid fa-copy mr-1"></i>Copy Code
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800">
+                <span class="font-bold block mb-1"><i class="fa-solid fa-circle-info mr-1 text-golf-gold"></i>Interactive Pin Placement Tool:</span>
+                Open any hole's row on the main screen to move the cup location! It saves the placement immediately.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let scorecardData = {};
+        let courseConfiguration = [];
+        let activeHoleNumber = null;
+        let isResetArmed = false;
+        let isArchitectOpen = false;
+
+        function exportCourseConfiguration() {
+            const container = document.getElementById('export-container');
+            const textarea = document.getElementById('export-textarea');
+            const statusLabel = document.getElementById('export-copy-status');
+            
+            // Format configuration object nicely for copy/pasting directly into JavaScript code
+            const formattedJS = JSON.stringify(courseConfiguration, null, 4);
+            textarea.value = formattedJS;
+            
+            statusLabel.innerText = '';
+            container.classList.remove('hidden');
+        }
+
+        function copyExportedCode() {
+            const textarea = document.getElementById('export-textarea');
+            const statusLabel = document.getElementById('export-copy-status');
+            
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); // Mobile compatibility
+            
+            try {
+                document.execCommand('copy');
+                statusLabel.innerText = 'Copied to clipboard!';
+                setTimeout(() => { statusLabel.innerText = ''; }, 3000);
+            } catch (err) {
+                statusLabel.innerText = 'Failed to copy. Please manually select and copy.';
+            }
+        }
+
+        // Dom Query Caches
+        const listContainer = document.getElementById('scorecard-list');
+        const statToPar = document.getElementById('stat-to-par');
+        const statTotal = document.getElementById('stat-total');
+        const statThru = document.getElementById('stat-thru');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Modal Query Caches
+        const holeModal = document.getElementById('hole-modal');
+        const modalContent = holeModal.querySelector('.relative');
+        const modalHoleNo = document.getElementById('modal-hole-number');
+        const modalHoleYards = document.getElementById('modal-hole-yards');
+        const modalHoleName = document.getElementById('modal-hole-name');
+        const modalHolePar = document.getElementById('modal-hole-par');
+        const modalHoleTip = document.getElementById('modal-hole-tip');
+        const modalScoreDisplay = document.getElementById('modal-score-display');
+        const svgMapWrapper = document.getElementById('svg-map-wrapper');
+
+        // Architect Mode Elements
+        const architectPanel = document.getElementById('architect-panel');
+        const architectPanelContent = architectPanel.querySelector('.relative');
+        const architectTableBody = document.getElementById('architect-table-body');
+
+        function initApp() {
+            loadCachedData();
+            buildScorecardTable();
+            buildArchitectTable();
+            calculateOverallStats();
+            setupEventListeners();
+        }
+
+        function loadCachedData() {
+            // Load custom metrics configuration
+            const savedConfig = localStorage.getItem(CONFIG_CACHE_KEY);
+            if (savedConfig) {
+                try {
+                    courseConfiguration = JSON.parse(savedConfig);
+                } catch (e) {
+                    courseConfiguration = JSON.parse(JSON.stringify(DEFAULT_COURSE));
+                }
+            } else {
+                courseConfiguration = JSON.parse(JSON.stringify(DEFAULT_COURSE));
+            }
+
+            // Load saved user score entries
+            const savedScores = localStorage.getItem(SCORE_CACHE_KEY);
+            if (savedScores) {
+                try {
+                    scorecardData = JSON.parse(savedScores);
+                } catch (e) {
+                    scorecardData = {};
+                }
+            } else {
+                scorecardData = {};
+            }
+        }
+
+        function buildScorecardTable() {
+            listContainer.innerHTML = '';
+            courseConfiguration.forEach(hole => {
+                const score = scorecardData[hole.number] || 0;
+                const scoreDisplay = score > 0 ? score : '-';
+                const scoreBgClass = score > 0 ? 'bg-emerald-600 text-white font-black' : 'bg-stone-100 text-stone-400 font-bold';
+
+                const row = document.createElement('div');
+                row.className = "grid grid-cols-12 gap-1 px-4 py-3.5 items-center cursor-pointer hover:bg-stone-50 transition-colors tap-target";
+                row.setAttribute('data-hole-id', hole.number);
+                row.innerHTML = `
+                    <div class="col-span-5 flex flex-col">
+                        <span class="font-extrabold text-stone-800 text-sm">Hole ${hole.number}</span>
+                        <span class="text-xs text-stone-400 font-semibold truncate">${hole.name}</span>
+                    </div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500 font-mono">${hole.yards}</div>
+                    <div class="col-span-2 text-center text-xs font-bold text-stone-500 font-mono">P${hole.par}</div>
+                    <div class="col-span-3 flex justify-end pr-1">
+                        <span class="w-9 h-9 rounded-full flex items-center justify-center text-sm shadow-sm transition-all duration-200 ${scoreBgClass}">
+                            ${scoreDisplay}
+                        </span>
+                    </div>
+                `;
+                row.addEventListener('click', () => openHoleModal(hole.number));
+                listContainer.appendChild(row);
+            });
+        }
+
+        // Populates Architect parameters table matching user inputs
+        function buildArchitectTable() {
+            architectTableBody.innerHTML = '';
+            courseConfiguration.forEach((hole, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-stone-100 hover:bg-stone-50";
+                tr.innerHTML = `
+                    <td class="p-3 font-extrabold text-stone-700 font-mono">${hole.number}</td>
+                    <td class="p-2">
+                        <input type="text" class="w-full bg-white border border-stone-200 rounded px-2 py-1 focus:outline-none focus:border-emerald-600 font-medium" value="${hole.name}" onchange="updateHoleConfig(${idx}, 'name', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <select class="w-full bg-white border border-stone-200 rounded px-1 py-1 focus:outline-none focus:border-emerald-600 font-mono" onchange="updateHoleConfig(${idx}, 'par', this.value)">
+                            <option value="2" ${hole.par == 2 ? 'selected' : ''}>P2</option>
+                            <option value="3" ${hole.par == 3 ? 'selected' : ''}>P3</option>
+                            <option value="4" ${hole.par == 4 ? 'selected' : ''}>P4</option>
+                            <option value="5" ${hole.par == 5 ? 'selected' : ''}>P5</option>
+                        </select>
+                    </td>
+                    <td class="p-2">
+                        <input type="number" class="w-16 bg-white border border-stone-200 rounded px-2 py-1 focus:outline-none focus:border-emerald-600 font-mono" value="${hole.yards}" onchange="updateHoleConfig(${idx}, 'yards', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <textarea class="w-full bg-white border border-stone-200 rounded px-2 py-1 focus:outline-none focus:border-emerald-600 leading-tight" rows="1" onchange="updateHoleConfig(${idx}, 'tip', this.value)">${hole.tip}</textarea>
+                    </td>
+                `;
+                architectTableBody.appendChild(tr);
+            });
+        }
+
+        // Interactive Configuration Updates Sync Callback
+        function updateHoleConfig(index, key, value) {
+            if (key === 'par' || key === 'yards') {
+                courseConfiguration[index][key] = parseInt(value, 10) || 3;
+            } else {
+                courseConfiguration[index][key] = value;
+            }
+            saveConfig();
+            buildScorecardTable();
+            calculateOverallStats();
+        }
+
+        function saveConfig() {
+            localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(courseConfiguration));
+        }
+
+        function calculateOverallStats() {
+            let totalStrokes = 0;
+            let thruCount = 0;
+            let totalParAtPlayedHoles = 0;
+
+            courseConfiguration.forEach(hole => {
+                const s = scorecardData[hole.number] || 0;
+                if (s > 0) {
+                    totalStrokes += s;
+                    thruCount++;
+                    totalParAtPlayedHoles += hole.par;
+                }
+            });
+
+            statTotal.innerText = totalStrokes;
+            statThru.innerText = `${thruCount}/18`;
+
+            if (thruCount === 0) {
+                statToPar.innerText = 'E';
+                statToPar.className = "text-2xl font-black text-stone-800";
+            } else {
+                const parDiff = totalStrokes - totalParAtPlayedHoles;
+                if (parDiff === 0) {
+                    statToPar.innerText = 'E';
+                    statToPar.className = "text-2xl font-black text-stone-600";
+                } else if (parDiff > 0) {
+                    statToPar.innerText = `+${parDiff}`;
+                    statToPar.className = "text-2xl font-black text-red-600";
+                } else {
+                    statToPar.innerText = `${parDiff}`;
+                    statToPar.className = "text-2xl font-black text-emerald-600 font-mono";
+                }
+            }
+        }
+
+        function adjustScore(holeNum, delta) {
+            const holeDef = courseConfiguration.find(h => h.number === holeNum);
+            let score = scorecardData[holeNum] || 0;
+
+            if (score === 0) {
+                score = holeDef.par;
+            } else {
+                score += delta;
+            }
+
+            if (score < 1) score = 1;
+
+            scorecardData[holeNum] = score;
+            localStorage.setItem(SCORE_CACHE_KEY, JSON.stringify(scorecardData));
+
+            buildScorecardTable();
+            calculateOverallStats();
+            
+            if (activeHoleNumber === holeNum) {
+                modalScoreDisplay.innerText = score;
+            }
+        }
+
+        function generateOverheadSVG(hole) {
+            let obstaclesSVG = '';
+            
+            hole.obstacles.forEach(obs => {
+                if (obs.type === 'rect') {
+                    obstaclesSVG += `
+                        <g>
+                            <rect x="${obs.x}" y="${obs.y}" width="${obs.w}" height="${obs.h}" rx="6" fill="${obs.color}" stroke="#14532d" stroke-width="1.5" opacity="0.9" />
+                            <text x="${obs.x + obs.w/2}" y="${obs.y + obs.h/2 + 3.5}" fill="#ffffff" font-size="7.5" font-family="sans-serif" font-weight="900" text-anchor="middle">${obs.label}</text>
+                        </g>
+                    `;
+                } else if (obs.type === 'circle') {
+                    obstaclesSVG += `
+                        <g>
+                            <circle cx="${obs.x}" cy="${obs.y}" r="${obs.r}" fill="${obs.color}" stroke="#14532d" stroke-width="1.5" opacity="0.9" />
+                            <text x="${obs.x}" y="${obs.y + 2.5}" fill="#ffffff" font-size="7.5" font-family="sans-serif" font-weight="900" text-anchor="middle">${obs.label}</text>
+                        </g>
+                    `;
+                }
+            });
+
+            // Curved guideline calculation
+            const midX = (hole.tee.x + hole.pin.x) / 2;
+            const midY = ((hole.tee.y + hole.pin.y) / 2) - 40; 
+            const pathData = `M ${hole.tee.x} ${hole.tee.y} Q ${midX} ${midY} ${hole.pin.x} ${hole.pin.y}`;
+
+            return `
+                <svg id="interactive-svg-canvas" viewBox="0 0 300 240" class="w-full h-full max-h-[200px]">
+                    <rect x="5" y="5" width="290" height="230" rx="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-dasharray="6,4" />
+                    
+                    <!-- Guideline -->
+                    <path d="${pathData}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-dasharray="8,5" />
+                    
+                    <!-- Obstacles Layer -->
+                    ${obstaclesSVG}
+                    
+                    <!-- Tee Box (Gold Area) -->
+                    <g id="tee-box-group" transform="translate(${hole.tee.x - 12}, ${hole.tee.y - 8})">
+                        <rect x="0" y="0" width="24" height="16" rx="2" fill="#d4af37" stroke="#ffffff" stroke-width="1" />
+                        <text x="12" y="10.5" fill="#1e1b4b" font-size="7" font-weight="900" text-anchor="middle">TEE</text>
+                    </g>
+                    
+                    <!-- Target Cup Pin (Pink Target) -->
+                    <g id="pin-group">
+                        <line x1="${hole.pin.x}" y1="${hole.pin.y}" x2="${hole.pin.x}" y2="${hole.pin.y - 18}" stroke="#ffffff" stroke-width="2" />
+                        <polygon points="${hole.pin.x},${hole.pin.y - 18} ${hole.pin.x - 10},${hole.pin.y - 14} ${hole.pin.x},${hole.pin.y - 10}" fill="#ff1493" />
+                        <circle cx="${hole.pin.x}" cy="${hole.pin.y}" r="8" fill="#ff1493" stroke="#ffffff" stroke-width="1" />
+                        <circle cx="${hole.pin.x}" cy="${hole.pin.y}" r="2" fill="#ffffff" />
+                    </g>
+                </svg>
+            `;
+        }
+
+        function openHoleModal(holeId) {
+            const holeDef = courseConfiguration.find(h => h.number === holeId);
+            if (!holeDef) return;
+
+            activeHoleNumber = holeId;
+            abortResetSequence();
+
+            modalHoleNo.innerText = `Hole ${holeDef.number}`;
+            modalHoleYards.innerText = `${holeDef.yards} Yards`;
+            modalHoleName.innerText = holeDef.name;
+            modalHolePar.innerText = `Par ${holeDef.par}`;
+            modalHoleTip.innerText = holeDef.tip;
+
+            const score = scorecardData[holeId] || 0;
+            modalScoreDisplay.innerText = score > 0 ? score : '-';
+
+            // Generate map layout
+            svgMapWrapper.innerHTML = generateOverheadSVG(holeDef);
+
+            // Activate slide animation
+            holeModal.classList.remove('hidden');
+            setTimeout(() => {
+                holeModal.classList.remove('opacity-0');
+                modalContent.classList.remove('translate-y-full');
+            }, 15);
+
+            attachMapInteractions();
+        }
+
+        // Lets the user tap the SVG green area to move the Pin Target (Pink Circle) location!
+        function attachMapInteractions() {
+            const svgCanvas = document.getElementById('interactive-svg-canvas');
+            if (!svgCanvas) return;
+
+            svgCanvas.addEventListener('click', (e) => {
+                const rect = svgCanvas.getBoundingClientRect();
+                
+                // Convert screen coordinates to SVG viewBox (300x240) space
+                const scaleX = 300 / rect.width;
+                const scaleY = 240 / rect.height;
+                
+                const clickX = (e.clientX - rect.left) * scaleX;
+                const clickY = (e.clientY - rect.top) * scaleY;
+
+                // Restrict positioning boundaries to keep elements safely inside map limits
+                if (clickX > 15 && clickX < 285 && clickY > 15 && clickY < 225) {
+                    const holeDef = courseConfiguration.find(h => h.number === activeHoleNumber);
+                    if (holeDef) {
+                        holeDef.pin.x = Math.round(clickX);
+                        holeDef.pin.y = Math.round(clickY);
+                        saveConfig();
+                        
+                        // Re-render overhead diagram
+                        svgMapWrapper.innerHTML = generateOverheadSVG(holeDef);
+                    }
+                }
+            });
+        }
+
+        function closeHoleModal() {
+            activeHoleNumber = null;
+            holeModal.classList.add('opacity-0');
+            modalContent.classList.add('translate-y-full');
+            setTimeout(() => {
+                holeModal.classList.add('hidden');
+            }, 300);
+        }
+
+        function toggleArchitectMode() {
+            if (!isArchitectOpen) {
+                isArchitectOpen = true;
+                buildArchitectTable();
+                architectPanel.classList.remove('hidden');
+                setTimeout(() => {
+                    architectPanel.classList.remove('opacity-0');
+                    architectPanelContent.classList.remove('translate-y-full');
+                }, 15);
+            } else {
+                isArchitectOpen = false;
+                architectPanel.classList.add('opacity-0');
+                architectPanelContent.classList.add('translate-y-full');
+                setTimeout(() => {
+                    architectPanel.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('modal-score-plus').addEventListener('click', () => {
+                if (activeHoleNumber) adjustScore(activeHoleNumber, 1);
+            });
+
+            document.getElementById('modal-score-minus').addEventListener('click', () => {
+                if (activeHoleNumber) adjustScore(activeHoleNumber, -1);
+            });
+
+            // Double Tap Safety Reset Logic
+            resetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!isResetArmed) {
+                    isResetArmed = true;
+                    resetBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i>Wipe Board? Tap Again!';
+                    resetBtn.className = "w-full py-4 rounded-xl text-white bg-red-800 hover:bg-red-900 font-extrabold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target";
+                } else {
+                    scorecardData = {};
+                    localStorage.removeItem(SCORE_CACHE_KEY);
+                    buildScorecardTable();
+                    calculateOverallStats();
+                    abortResetSequence();
+                }
+            });
+
+            // Global tap out cancellation
+            document.addEventListener('click', () => {
+                if (isResetArmed) {
+                    abortResetSequence();
+                }
+            });
+        }
+
+        function abortResetSequence() {
+            isResetArmed = false;
+            resetBtn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left mr-2"></i>Start New Round';
+            resetBtn.className = "w-full py-4 rounded-xl text-stone-700 bg-stone-200 hover:bg-stone-300 font-bold tracking-wide transition-all duration-300 min-h-[54px] shadow-sm tap-target";
+        }
+
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
